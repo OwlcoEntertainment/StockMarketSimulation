@@ -1,35 +1,18 @@
 import random
-
-import sys
-
-import time
-
-from pathlib import Path
-
 import streamlit as st
-
 import math
-
-current_dir = Path(__file__).resolve().parent
-
-parent_dir = current_dir.parent
-
-if str(parent_dir) not in sys.path:
-
-    sys.path.append(str(parent_dir))
-
-
 from gametools import GT
 
 st.title("Luke's Stock Market")
 chart_placeholder = st.empty()
-
+ticker_placeholder = st.empty()
+deal_placeholder = st.empty()
 if "price_history" not in st.session_state:
     st.session_state.price_history = []
 
-starting_buyers = 1000
+starting_buyers = 100
 
-starting_sellers = 200
+starting_sellers = 20
 
 starting_stocks = 1
 
@@ -38,11 +21,8 @@ order_id_counter = 0
 
 
 buyers = {} #id: [name, [stocks], confidence, money, greed, realism]
-
 stocks = {} #id: [name, value, monentum, stability]
-
 sellers = {} #id: [name, [stocks], confidence, money, greed, realism]
-
 
 order_book = {} #user_id: [buy_or_sell, price, stock_id]
 
@@ -50,14 +30,14 @@ order_book = {} #user_id: [buy_or_sell, price, stock_id]
 for b in range(0, starting_buyers):
     b_id = b
     name = GT.name_gen()
-    name = (name[0], name[1])
+    name = (name[0]+' '+name[1])
     buyers[b_id] = [name, [], random.random(), random.randint(100, 10000), random.random(), random.random()]
 
 print('Buyers created')
 
 
 for sto in range(0, starting_stocks):
-    starting_value = random.randint(1, 100)
+    starting_value = random.randint(50, 400)
     stocks[sto] = [GT.stock_name_generator(), starting_value, 0, 0]
 
 print('Stocks created')
@@ -66,7 +46,7 @@ print('Stocks created')
 for se in range(0, starting_sellers):
     s_id = se
     name = GT.name_gen()
-    name = (name[0], name[1])
+    name = (name[0]+' '+name[1])
     number_of_stocks = random.randint(1, 100)
 
     seller_stocks = []
@@ -117,9 +97,9 @@ def search_seller_stocks(stock_id, number, exclude='-1'):
 
 def stock_loop():
     while True:
-        if random.random() < 0.0001:
+        if random.random() < 0.0002:
             buyer_tick()
-        if random.random() < 0.0001:
+        if random.random() < 0.0002:
             seller_tick()
         order_book_tick()
 
@@ -141,7 +121,7 @@ def buyer_tick():
             stock_price = stocks[chosen_stock][1]
             price = 0
             if stock_price*1.2 < budget:
-                price = math.trunc(stock_price*random.uniform(1, 1.3))
+                price = math.trunc(stock_price*random.uniform(0.9, 1.2))
             elif stock_price <= budget:
                 price = math.trunc(stock_price*random.uniform(0.9, 1.1))
             elif stock_price > budget:
@@ -178,136 +158,107 @@ def add_to_order_book(stock_id, buying, price, user_id):
 #remade by AI (code originate from me)
 
 def order_book_tick():
-
     all_buyers = [k for k in order_book.keys() if order_book[k][0] == 'buy']
-
     all_sellers = [k for k in order_book.keys() if order_book[k][0] == 'sell']
 
-   
-
     for a in all_buyers:
-
         buyer_budget = order_book[a][1]
-
         buyer_stock_id = order_book[a][2]
-
         buyer_user_id = order_book[a][3]
-
-
         valid_sellers = [
-
             k for k in all_sellers
-
             if order_book[k][2] == buyer_stock_id
-
             and order_book[k][1] <= buyer_budget
-
             and order_book[k][3] != buyer_user_id
-
         ]
 
-       
-
         if valid_sellers:
-
             best_price = -1
-
             best_seller_order_id = None
 
-           
-
             for v in valid_sellers:
-
                 if best_price == -1 or order_book[v][1] < best_price:
-
                     best_price = order_book[v][1]
-
                     best_seller_order_id = v
 
-
             seller_user_id = order_book[best_seller_order_id][3]
-
            
-
             if seller_user_id in sellers:
                 purchase_from_single(seller_user_id, buyer_user_id, buyer_stock_id, best_price, 1)
-
-
             del order_book[a]
-
             del order_book[best_seller_order_id]
-
-
             break
 
 def purchase_from_single(seller_id, buyer_id, stock_id, total_price, number_of_stocks):
-
     buyers[buyer_id][3] -= total_price
-
     sellers[seller_id][3] += total_price
-
     new_stocks = []
-
     for x in range(0, number_of_stocks):
-
         seller_stocks_ = sellers[seller_id][1]
-
         seller_stocks_.remove(stock_id)
-
         sellers[seller_id][1] = seller_stocks_
 
     for x in range(0, number_of_stocks):
-
         new_stocks.append(stock_id)
 
     buyers[buyer_id][1] = new_stocks
-
     stocks[stock_id][1] = total_price/number_of_stocks
-
     print(f"{buyers[buyer_id][0]} has bought {number_of_stocks} of {stocks[stock_id][0]} stock from {sellers[seller_id][0]} for £{total_price:.2f} (or £{total_price/number_of_stocks:.2f} per stock)")
 
+    # 1. Get the stock name and formatted price
+    stock_name = stocks[stock_id][0]
+    current_unit_price = total_price / number_of_stocks
+    
+    # 2. Update the subtitle placeholder live!
+    # This stays exactly how it was—it will naturally render below the chart now!
+    ticker_placeholder.metric(label=stock_name, value=f"£{current_unit_price:.2f}")
+    chart_placeholder.line_chart(
+        st.session_state.price_history,
+        x_label="Time (Days)",
+        y_label="Price (£)"
+    )
+    buyer_name = buyers[buyer_id][0]
+    deal_placeholder.info(
+        f"🔔 **Latest Deal:** {buyer_name} bought {number_of_stocks} share(s) for a total of £{total_price:.2f}."
+    )
     current_unit_price = total_price / number_of_stocks
     st.session_state.price_history.append(current_unit_price)
 
     if len(st.session_state.price_history) > 500:
         st.session_state.price_history.pop(0)
 
-    chart_placeholder.line_chart(st.session_state.price_history)
-
     if sellers[seller_id][1] == []:
-
         new_id = len(list(buyers.keys()))
-
         buyers[new_id] = sellers[seller_id]
-
         del sellers[seller_id]
 
-
 def connect_best_seller(sellers_ids, stock_id):
-
     best_price = -1
-
     best_vendor = None
-
     stock_price = stocks[stock_id][1]
-
     stock_momentum = stocks[stock_id][2]
 
     for x in sellers_ids:
-
         seller_greed = sellers[x][4]
-
         price = stock_price*(1-(stock_momentum/2))*(1+(seller_greed/2))
-
         if best_price == -1 or best_price > price:
-
             best_price = price
-
             best_vendor = x
 
     return [best_vendor, best_price]
 
 
-# Replace your lone stock_loop() call with this:
-if st.button("Start Simulation"):
+if "running" not in st.session_state:
+    st.session_state.running = False
+
+# 2. If the simulation HAS NOT started, show the button
+if not st.session_state.running:
+    if st.button("Start Simulation"):
+        st.session_state.running = True  # Flip the switch to True
+        st.rerun()  # Instantly refresh the page to hide the button
+
+# 3. If the simulation HAS started, run the loop forever
+else:
+    # Optional: Add a little text indicator where the button used to be
+    st.caption("🟢 Market is live and trading...")
     stock_loop()

@@ -3,10 +3,16 @@ import streamlit as st
 import math
 from gametools import GT
 
-st.title("Luke's Stock Market")
+st.title("Luke's Simulated Stock Market")
 chart_placeholder = st.empty()
 ticker_placeholder = st.empty()
 deal_placeholder = st.empty()
+market_details = st.empty()
+richest_placeholder = st.empty()
+
+market_low = 500
+market_high = 0
+
 if "price_history" not in st.session_state:
     st.session_state.price_history = []
 
@@ -19,6 +25,7 @@ starting_stocks = 1
 
 order_id_counter = 0
 
+last_price = 0
 
 buyers = {} #id: [name, [stocks], confidence, money, greed, realism]
 stocks = {} #id: [name, value, monentum, stability]
@@ -26,13 +33,15 @@ sellers = {} #id: [name, [stocks], confidence, money, greed, realism]
 
 order_book = {} #user_id: [buy_or_sell, price, stock_id]
 
+wealth_leaderboard = [] # [type, id, money]
 
 for b in range(0, starting_buyers):
+    
     b_id = b
     name = GT.name_gen()
     name = (name[0]+' '+name[1])
     buyers[b_id] = [name, [], random.random(), random.randint(100, 10000), random.random(), random.random()]
-
+    wealth_leaderboard.append(['buyer', b_id, buyers[b_id][3]])
 print('Buyers created')
 
 
@@ -56,8 +65,10 @@ for se in range(0, starting_sellers):
         seller_stocks.append(random.choice(list(stocks.keys())))
 
     sellers[s_id] = [name, seller_stocks, random.random(), random.randint(100,100000), random.random(), random.random()]
-
+    wealth_leaderboard.append(['seller', s_id, sellers[s_id][3]])
 print('Sellers created')
+
+wealth_leaderboard.sort(key=lambda x: x[2], reverse=True)
 
 
 def search_seller_stocks(stock_id, number, exclude='-1'):
@@ -92,17 +103,27 @@ def search_seller_stocks(stock_id, number, exclude='-1'):
 
         return []
 
-
-
-
 def stock_loop():
+    richest_player = wealth_leaderboard[0]
+    player_type = richest_player[0]
+    player_id = richest_player[1]
+    player_money = richest_player[2]
+
+    # Look up their generated name based on their type
+    if player_type == 'buyer':
+        richest_name = buyers[player_id][0]
+    else:
+        richest_name = sellers[player_id][0]
+
+    # Display it on your website!
+    richest_placeholder.info(f"🔔 **Richest Person:** {richest_name} with £{player_money}.")
+
     while True:
-        if random.random() < 0.0002:
+        if random.random() < 0.0005:
             buyer_tick()
-        if random.random() < 0.0002:
+        if random.random() < 0.0005:
             seller_tick()
         order_book_tick()
-
 
 def buyer_tick():
         buyer = random.choice(list(buyers.keys()))
@@ -113,6 +134,12 @@ def buyer_tick():
         realism = buyer_list[5]
         budget = money*(confidence/2)*(1.5-greed)  
         available_stocks = [k for k in stocks.keys() if stocks[k][1] <= budget]
+        amount = 1
+        if number_of_stocks > 10 and random.random() > 0.7:
+            new_id = len(list(sellers.keys()))
+            sellers[new_id] = buyer_list
+            del buyers[buyer]
+            return
         if available_stocks:
             if realism <= 0.3:
                 chosen_stock = random.choice(list(stocks.keys()))
@@ -128,7 +155,14 @@ def buyer_tick():
                 price = budget
             else:
                 price = stock_price
-            add_to_order_book(chosen_stock, True, price, buyer)
+            
+            price *= ((1-greed)/5)+0.8
+
+            if budget // stock_price > 1:
+                amount = math.trunc(budget // stock_price)
+            if amount == 0:
+                amount = 1
+            add_to_order_book(chosen_stock, True, price, buyer, amount)
 
 def seller_tick():
     seller = random.choice(list(sellers.keys()))
@@ -144,15 +178,15 @@ def seller_tick():
         return
     stock_to_sell = random.choice(owned_stocks)
     price = int(stocks[stock_to_sell][1]*(0.75+greed)*(1.8-confidence)*1+(realism/2))
-    add_to_order_book(stock_to_sell, False, price, seller)
+    add_to_order_book(stock_to_sell, False, price, seller, 0)
 
-def add_to_order_book(stock_id, buying, price, user_id):
+def add_to_order_book(stock_id, buying, price, user_id, amount):
     global order_id_counter
     if buying == True:
         buy_or_sell = 'buy'
     else:
         buy_or_sell = 'sell'
-    order_book[order_id_counter] = [buy_or_sell, price, stock_id, user_id]
+    order_book[order_id_counter] = [buy_or_sell, price, stock_id, user_id, amount]
     order_id_counter += 1
 
 #remade by AI (code originate from me)
@@ -160,14 +194,21 @@ def add_to_order_book(stock_id, buying, price, user_id):
 def order_book_tick():
     all_buyers = [k for k in order_book.keys() if order_book[k][0] == 'buy']
     all_sellers = [k for k in order_book.keys() if order_book[k][0] == 'sell']
-
     for a in all_buyers:
+        # 1. Skip if this buyer order was deleted by a previous match
+        if a not in order_book:
+            continue
+            
         buyer_budget = order_book[a][1]
         buyer_stock_id = order_book[a][2]
         buyer_user_id = order_book[a][3]
+        num_of_stocks = order_book[a][4]
+
+        # 2. Find sellers that still exist in the book
         valid_sellers = [
             k for k in all_sellers
-            if order_book[k][2] == buyer_stock_id
+            if k in order_book 
+            and order_book[k][2] == buyer_stock_id
             and order_book[k][1] <= buyer_budget
             and order_book[k][3] != buyer_user_id
         ]
@@ -176,20 +217,31 @@ def order_book_tick():
             best_price = -1
             best_seller_order_id = None
 
+            # 3. Find the cheapest seller
             for v in valid_sellers:
                 if best_price == -1 or order_book[v][1] < best_price:
                     best_price = order_book[v][1]
                     best_seller_order_id = v
 
-            seller_user_id = order_book[best_seller_order_id][3]
-           
-            if seller_user_id in sellers:
-                purchase_from_single(seller_user_id, buyer_user_id, buyer_stock_id, best_price, 1)
-            del order_book[a]
-            del order_book[best_seller_order_id]
-            break
+            if best_seller_order_id is not None:
+                seller_user_id = order_book[best_seller_order_id][3]
+            
+                if seller_user_id in sellers and buyer_user_id in buyers:
+                    # 4. Process the transaction once
+                    if sellers[seller_user_id][1].count(buyer_stock_id) >= num_of_stocks:
+                        purchase_from_single(seller_user_id, buyer_user_id, buyer_stock_id, best_price*num_of_stocks, num_of_stocks)
+                    else:
+                        count = sellers[seller_user_id][1].count(buyer_stock_id)
+                        purchase_from_single(seller_user_id, buyer_user_id, buyer_stock_id, best_price*count, count)
+                
+                # 5. Cleanly wipe both complete orders out of the book
+                if a in order_book:
+                    del order_book[a]
+                if best_seller_order_id in order_book:
+                    del order_book[best_seller_order_id]
 
 def purchase_from_single(seller_id, buyer_id, stock_id, total_price, number_of_stocks):
+    global last_price, market_low, market_high
     buyers[buyer_id][3] -= total_price
     sellers[seller_id][3] += total_price
     new_stocks = []
@@ -203,7 +255,7 @@ def purchase_from_single(seller_id, buyer_id, stock_id, total_price, number_of_s
 
     buyers[buyer_id][1] = new_stocks
     stocks[stock_id][1] = total_price/number_of_stocks
-    print(f"{buyers[buyer_id][0]} has bought {number_of_stocks} of {stocks[stock_id][0]} stock from {sellers[seller_id][0]} for £{total_price:.2f} (or £{total_price/number_of_stocks:.2f} per stock)")
+    #print(f"{buyers[buyer_id][0]} has bought {number_of_stocks} of {stocks[stock_id][0]} stock from {sellers[seller_id][0]} for £{total_price:.2f} (or £{total_price/number_of_stocks:.2f} per stock)")
 
     # 1. Get the stock name and formatted price
     stock_name = stocks[stock_id][0]
@@ -211,15 +263,22 @@ def purchase_from_single(seller_id, buyer_id, stock_id, total_price, number_of_s
     
     # 2. Update the subtitle placeholder live!
     # This stays exactly how it was—it will naturally render below the chart now!
-    ticker_placeholder.metric(label=stock_name, value=f"£{current_unit_price:.2f}")
+    if total_price/number_of_stocks > last_price:
+        arrow = "▲"
+    elif total_price/number_of_stocks < last_price:
+        arrow = '▼'
+    else:
+        arrow = '~'
+    last_price = total_price/number_of_stocks
+    ticker_placeholder.metric(label=stock_name, value=f"£{current_unit_price:.2f} {arrow}")
     chart_placeholder.line_chart(
         st.session_state.price_history,
-        x_label="Time (Days)",
+        x_label="Time (Weeks)",
         y_label="Price (£)"
     )
     buyer_name = buyers[buyer_id][0]
     deal_placeholder.info(
-        f"🔔 **Latest Deal:** {buyer_name} bought {number_of_stocks} share(s) for a total of £{total_price:.2f}."
+        f"**Latest Deal:** {buyer_name} bought {number_of_stocks} share(s) for a total of £{total_price:.2f}."
     )
     current_unit_price = total_price / number_of_stocks
     st.session_state.price_history.append(current_unit_price)
@@ -231,6 +290,35 @@ def purchase_from_single(seller_id, buyer_id, stock_id, total_price, number_of_s
         new_id = len(list(buyers.keys()))
         buyers[new_id] = sellers[seller_id]
         del sellers[seller_id]
+    
+    richest_player = wealth_leaderboard[0]
+    player_type = richest_player[0]
+    player_id = richest_player[1]
+    player_money = richest_player[2]    
+
+    if player_type == 'buyer':
+        richest_name = buyers[player_id][0]
+    else:
+        richest_name = sellers[player_id][0]
+
+
+    if buyer_id in buyers:
+        if buyers[buyer_id][3] > wealth_leaderboard[0][2]:
+            wealth_leaderboard.append(['buyer', buyer_id, buyers[buyer_id][3]])
+            wealth_leaderboard.sort(key=lambda x: x[2], reverse=True)
+            richest_placeholder.info(f"**Richest Person:** {richest_name} with £{player_money}.")
+    if seller_id in sellers:
+        if sellers[seller_id][3] > wealth_leaderboard[0][2]:
+            wealth_leaderboard.append(['seller', seller_id, sellers[seller_id][3]])
+            wealth_leaderboard.sort(key=lambda x: x[2], reverse=True)
+            richest_placeholder.info(f"**Richest Person:** {richest_name} with £{player_money}.")
+
+    if current_unit_price > market_high:
+        market_high = current_unit_price
+        market_details.info(f"**Market High:** £{market_high}      **Market Low:** £{market_low}")
+    elif current_unit_price < market_low:
+        market_low = current_unit_price
+        market_details.info(f"**Market High:** £{market_high}      **Market Low:** £{market_low}")
 
 def connect_best_seller(sellers_ids, stock_id):
     best_price = -1

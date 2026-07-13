@@ -12,8 +12,6 @@ import time
 
 performance_mode = False
 
-st.beta_set_page_config(page_title='Simulated Stock Market', page_icon = favicon, layout = 'wide', initial_sidebar_state = 'auto')
-
 st.title("Luke's Simulated Stock Market")
 
 chart_placeholder = st.empty()

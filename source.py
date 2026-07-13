@@ -12,6 +12,7 @@ import time
 
 performance_mode = False
 
+st.beta_set_page_config(page_title='Simulated Stock Market', page_icon = favicon, layout = 'wide', initial_sidebar_state = 'auto')
 
 st.title("Luke's Simulated Stock Market")
 
@@ -49,7 +50,7 @@ confidence_override = 1
 
 
 if performance_mode == True:
-    starting_buyers = 100
+    starting_buyers = 20
     starting_sellers = 20
     max_order_book_length = 75
 
@@ -83,7 +84,7 @@ print('Buyers created')
 
 
 for sto in range(0, starting_stocks):
-    starting_value = 200 # random.randint(50, 400)
+    starting_value = 10 # random.randint(50, 400)
     stocks[sto] = [GT.stock_name_generator(), starting_value, 0, 0]
 
 
@@ -207,13 +208,13 @@ def stock_loop():
         if random.random() < 0.1:
             seller_tick()
         order_book_tick()
-        if random.random() < 0.0001: 
+        if random.random() < 0.00001: 
             confidence_capacity = random.uniform(0.5, 0.6) # Total panic selling
             crashing = True
             st.toast("🚨 MAJOR NEWS EVENT: Market Panic!")
             order_book.clear()
             continue
-        if random.random() < 0.0001:
+        if random.random() < 0.00001:
             confidence_capacity = 3
             st.toast("🚨 MAJOR NEWS EVENT: Market excitement!")
             continue

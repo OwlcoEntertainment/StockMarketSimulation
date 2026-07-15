@@ -445,7 +445,7 @@ def purchase_from_single(seller_id, buyer_id, stock_id, total_price, number_of_s
     if current_unit_price > market_high:
         market_high = current_unit_price
         market_details.info(f"**Market High:** £{round(market_high,2)}      **Market Low:** £{round(market_low,2)}")
-    elif current_unit_price < market_low:
+    if current_unit_price < market_low:
         market_low = current_unit_price
         market_details.info(f"**Market High:** £{round(market_high,2)}      **Market Low:** £{round(market_low,2)}")
 

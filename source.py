@@ -8,28 +8,23 @@ from gametools import GT
 
 import time
 
-
+version = "0.23"
 
 performance_mode = False
 
 st.title("Luke's Simulated Stock Market")
+st.caption(f"v{version}")
 
 chart_placeholder = st.empty()
-
 ticker_placeholder = st.empty()
-
 deal_placeholder = st.empty()
-
 market_details = st.empty()
-
 richest_placeholder = st.empty()
 
 
 max_order_book_length = 500
 
-
 market_low = 500
-
 market_high = 0
 
 
@@ -64,7 +59,6 @@ sellers = {} #id: [name, [stocks], confidence, money, greed, realism]
 
 order_book = {} #user_id: [buy_or_sell, price, stock_id]
 
-
 wealth_leaderboard = [] # [type, id, money]
 
 total_stocks = 0
@@ -79,16 +73,11 @@ for b in range(0, starting_buyers):
 
 print('Buyers created')
 
-
-
 for sto in range(0, starting_stocks):
     starting_value = 10 # random.randint(50, 400)
     stocks[sto] = [GT.stock_name_generator(), starting_value, 0, 0]
 
-
 print('Stocks created')
-
-
 
 for se in range(0, starting_sellers):
     s_id = se
@@ -108,40 +97,24 @@ for se in range(0, starting_sellers):
 
 print('Sellers created')
 
-
 wealth_leaderboard.sort(key=lambda x: x[2], reverse=True) 
 
 
 def search_seller_stocks(stock_id, number, exclude='-1'):
-
     available_sellers = []
-
     valid_sellers_list = [k for k in sellers.keys() if k != exclude]
-
     for x in valid_sellers_list:
-
         available_sellers.append(x)
-
     if available_sellers:
-
         for x in available_sellers:
-
             enough_stocks = []
-
             if sellers[x][1].count(stock_id) >= number:
-
                 enough_stocks.append(x)
-
         if enough_stocks:
-
             return enough_stocks
-
         else:
-
             return []
-
     else:
-
         return []
 
 def stock_loop():
